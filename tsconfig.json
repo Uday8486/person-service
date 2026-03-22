@@ -6,6 +6,8 @@
     "lib": [
       "es2022"
     ],
+    "outDir": "./dist",
+    "rootDir": "./",
     "declaration": true,
     "strict": true,
     "noImplicitAny": true,
@@ -20,13 +22,22 @@
     "inlineSources": true,
     "experimentalDecorators": true,
     "strictPropertyInitialization": false,
+    "esModuleInterop": true,
     "skipLibCheck": true,
     "typeRoots": [
       "./node_modules/@types"
-    ]
+    ],
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true
   },
+  "include": [
+    "src/**/*",
+    "bin/**/*",
+    "lib/**/*",
+    "tests/**/*"
+  ],
   "exclude": [
     "node_modules",
-    "cdk.out"
+    "dist"
   ]
 }
