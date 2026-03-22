@@ -13,6 +13,42 @@ A high-performance AWS Serverless API for managing person records, built with **
 -   **Testing**: [Vitest](https://vitest.dev/) & [aws-sdk-client-mock](https://github.com/m-radzikowski/aws-sdk-client-mock)
 -   **Development**: [esbuild](https://esbuild.github.io/) (Local bundling)
 
+## 🏗 Architecture Diagram
+
+```mermaid
+graph LR
+    Client([Client]) -->|HTTP GET/POST| APIGW[Amazon API Gateway POST/GET]
+    
+    subgraph Compute Layer
+        APIGW -->|Proxy Integration| Lambda[AWS Lambda: Node.js 20 & Fastify]
+    end
+    
+    subgraph Data Layer
+        Lambda -->|Read/Write Model| DDB[(Amazon DynamoDB: Single Table)]
+    end
+    
+    subgraph Event Bus
+        Lambda -.->|Async Publish| SNS{Amazon SNS: PersonCreated Topic}
+    end
+    
+    subgraph Observability
+        Lambda -.->|Traces| XRay[AWS X-Ray]
+        Lambda -.->|Logs & Metrics| CW[Amazon CloudWatch]
+    end
+    
+    %% Colors & Styling
+    classDef aws fill:#FF9900,stroke:#232F3E,stroke-width:2px,color:#232F3E;
+    classDef compute fill:#ff9900,stroke:#232f3e,stroke-width:2px,color:white;
+    classDef storage fill:#3B48CC,stroke:#232f3e,stroke-width:2px,color:white;
+    classDef messaging fill:#FF4F8B,stroke:#232f3e,stroke-width:2px,color:white;
+    classDef monitor fill:#7AA116,stroke:#232f3e,stroke-width:2px,color:white;
+    
+    class APIGW,Lambda compute;
+    class DDB storage;
+    class SNS messaging;
+    class XRay,CW monitor;
+```
+
 ## ⚙️ Environment Variables
 
 The Lambda function uses the following variables (automatically configured via CDK):
