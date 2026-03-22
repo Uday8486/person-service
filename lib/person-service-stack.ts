@@ -16,20 +16,43 @@ export interface PersonServiceStackProps extends cdk.StackProps {
   appEnv: AppEnv;
 }
 
+interface EnvironmentConfig {
+  removalPolicy: cdk.RemovalPolicy;
+  logRetention: logs.RetentionDays;
+  throttlingBurstLimit: number;
+  throttlingRateLimit: number;
+}
+
+const envConfigs: Record<AppEnv, EnvironmentConfig> = {
+  stage: {
+    removalPolicy: cdk.RemovalPolicy.DESTROY,
+    logRetention: logs.RetentionDays.ONE_MONTH,
+    throttlingBurstLimit: 100,
+    throttlingRateLimit: 50,
+  },
+  prod: {
+    removalPolicy: cdk.RemovalPolicy.RETAIN,
+    logRetention: logs.RetentionDays.THREE_MONTHS,
+    throttlingBurstLimit: 1500,
+    throttlingRateLimit: 1000,
+  },
+};
+
 export class PersonServiceStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: PersonServiceStackProps) {
     super(scope, id, props);
 
     const { appEnv } = props;
+    const config = envConfigs[appEnv];
 
     // The code that defines your stack goes here
 
     const table = new dynamodb.Table(this, 'PersonTable', {
-      tableName: `PersonTable`,
+      tableName: `PersonTable-${appEnv}`,
       partitionKey: { name: 'PK', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'SK', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      removalPolicy: config.removalPolicy,
       pointInTimeRecoverySpecification: {
         pointInTimeRecoveryEnabled: true,
       },
@@ -43,11 +66,12 @@ export class PersonServiceStack extends cdk.Stack {
     });
 
     const topic = new sns.Topic(this, 'PersonCreatedTopic', {
-      topicName: `PersonCreatedTopic`,
+      topicName: `PersonCreatedTopic-${appEnv}`,
     });
 
     // Lambda Function
     const handler = new nodejs.NodejsFunction(this, 'PersonServiceLambda', {
+      functionName: `PersonServiceLambda-${appEnv}`,
       runtime: lambda.Runtime.NODEJS_20_X,
       architecture: lambda.Architecture.ARM_64,
       entry: path.join(__dirname, '../src/handler.ts'),
@@ -65,15 +89,16 @@ export class PersonServiceStack extends cdk.Stack {
         POWERTOOLS_METRICS_NAMESPACE: 'PersonServiceNamespace',
       },
       tracing: lambda.Tracing.ACTIVE,
-      logRetention: logs.RetentionDays.ONE_MONTH,
       memorySize: 512,
+      timeout: cdk.Duration.seconds(10),
+      logRetention: config.logRetention,
     });
 
     table.grantReadWriteData(handler);
     topic.grantPublish(handler);
 
     const api = new apigwv2.HttpApi(this, 'PersonServiceHttpApi', {
-      apiName: `PersonServiceAPI`,
+      apiName: `PersonServiceAPI-${appEnv}`,
       createDefaultStage: false
     });
 
@@ -84,7 +109,7 @@ export class PersonServiceStack extends cdk.Stack {
 
     api.addRoutes({
       path: '/person',
-      methods: [apigwv2.HttpMethod.ANY],
+      methods: [apigwv2.HttpMethod.GET, apigwv2.HttpMethod.POST],
       integration: integration,
       // authorizer // TODO: Add authorizer
     });
@@ -93,8 +118,8 @@ export class PersonServiceStack extends cdk.Stack {
       httpApi: api,
       stageName: '$default',
       throttle: {
-        rateLimit: 1000,
-        burstLimit: 500,
+        rateLimit: config.throttlingRateLimit,
+        burstLimit: config.throttlingBurstLimit,
       },
       autoDeploy: true,
     });

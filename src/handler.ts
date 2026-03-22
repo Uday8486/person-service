@@ -1,12 +1,11 @@
 import awsLambdaFastify from '@fastify/aws-lambda';
-import fastify from 'fastify';
-import { Metrics } from '@aws-lambda-powertools/metrics';
+import fastify, { FastifyReply } from 'fastify';
+import { metrics, logger } from './utils/observability';
 import { PersonService } from './services/person.service';
 import { PersonController } from './controllers/person.controller';
+import { getErrorResponse } from './utils/error-handling';
 
-
-const app = fastify({ logger: true });
-const metrics = new Metrics();
+export const app = fastify({ logger: false });
 
 const personService = new PersonService();
 const personController = new PersonController(personService);
@@ -61,6 +60,12 @@ const listResponseSchema = {
 
 app.addHook('onResponse', async () => {
     metrics.publishStoredMetrics();
+});
+
+app.setErrorHandler((error: unknown, _request, reply: FastifyReply) => {
+    const { statusCode, message } = getErrorResponse(error);
+    if (statusCode >= 500) logger.error('Unhandled internal error', { err: error });
+    reply.status(statusCode).send({ error: message });
 });
 
 app.post('/person', {

@@ -7,13 +7,9 @@ import {
 } from '@aws-sdk/lib-dynamodb';
 import { SNSClient, PublishCommand } from '@aws-sdk/client-sns';
 import { v4 as uuidv4 } from 'uuid';
-import { Logger } from '@aws-lambda-powertools/logger';
-import { Metrics, MetricUnit } from '@aws-lambda-powertools/metrics';
-import { Tracer } from '@aws-lambda-powertools/tracer';
-
-export const logger = new Logger();
-export const metrics = new Metrics();
-export const tracer = new Tracer();
+import { MetricUnit } from '@aws-lambda-powertools/metrics';
+import { logger, metrics, tracer } from '../utils/observability';
+import { BadRequestError } from '../errors/bad-request.error';
 
 import { PaginatedResult, Person } from '../models/person';
 
@@ -95,7 +91,7 @@ export class PersonService {
         const decoded = Buffer.from(cursor, 'base64').toString('utf-8');
         params.ExclusiveStartKey = JSON.parse(decoded);
       } catch (e) {
-        throw new Error('Invalid cursor format');
+        throw new BadRequestError('Invalid cursor format');
       }
     }
 

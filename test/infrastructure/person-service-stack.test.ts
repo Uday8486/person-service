@@ -35,7 +35,7 @@ describe('PersonServiceStack', () => {
   it('should have an SNS topic', () => {
     template.hasResource('AWS::SNS::Topic', {
       Properties: {
-        TopicName: 'PersonCreatedTopic',
+        TopicName: 'PersonCreatedTopic-stage',
       },
     });
   });
@@ -56,16 +56,21 @@ describe('PersonServiceStack', () => {
       TracingConfig: {
         Mode: 'Active',
       },
+      Timeout: 10,
     });
   });
 
   it('should have an HTTP API with correct routes', () => {
     template.hasResourceProperties('AWS::ApiGatewayV2::Api', {
-      Name: 'PersonServiceAPI',
+      Name: 'PersonServiceAPI-stage',
     });
 
     template.hasResourceProperties('AWS::ApiGatewayV2::Route', {
-      RouteKey: 'ANY /person',
+      RouteKey: 'GET /person',
+    });
+
+    template.hasResourceProperties('AWS::ApiGatewayV2::Route', {
+      RouteKey: 'POST /person',
     });
   });
 
@@ -74,8 +79,8 @@ describe('PersonServiceStack', () => {
       StageName: '$default',
       AutoDeploy: true,
       DefaultRouteSettings: {
-        ThrottlingBurstLimit: 500,
-        ThrottlingRateLimit: 1000,
+        ThrottlingBurstLimit: 100,
+        ThrottlingRateLimit: 50,
       },
     });
   });

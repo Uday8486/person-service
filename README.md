@@ -13,6 +13,31 @@ A high-performance AWS Serverless API for managing person records, built with **
 -   **Testing**: [Vitest](https://vitest.dev/) & [aws-sdk-client-mock](https://github.com/m-radzikowski/aws-sdk-client-mock)
 -   **Development**: [esbuild](https://esbuild.github.io/) (Local bundling)
 
+## ⚙️ Environment Variables
+
+The Lambda function uses the following variables (automatically configured via CDK):
+
+| Variable | Description |
+| :--- | :--- |
+| `TABLE_NAME` | The name of the DynamoDB table. |
+| `TOPIC_ARN` | The ARN of the SNS topic for notifications. |
+| `APP_ENV` | Application environment (`stage` or `prod`). |
+| `POWERTOOLS_SERVICE_NAME` | Service name for logging and metrics. |
+| `POWERTOOLS_METRICS_NAMESPACE` | Metrics namespace in CloudWatch. |
+
+## 🎯 Assumptions & Principles
+
+This project is implemented as a **BFF (Backend-for-Frontend) API** designed for modern web clients.
+
+*   **Target Metrics**: 
+    *   **Latency**: Average target round-trip time of ~100ms.
+    *   **Traffic**: Designed to handle an average of 1000 RPS (Requests Per Second) with rapid auto-scaling.
+*   **Design Values**:
+    *   **Simplicity over Over-Engineering**: Using standard patterns to ensure high readability and fast feature iteration.
+    *   **No Infrastructure Management**: Built as a 100% Serverless stack to eliminate maintenance overhead.
+    *   **Highly Available**: Using DynamoDB for multi-AZ persistence and on-demand throughput.
+*   **Future Proof**: The setup can be optimized (DAX, Provisioned Concurrency, etc.) once exact SLOs and long-term performance requirements are established.
+
 ## 🛠 Prerequisites
 
 -   **Node.js**: v20 or higher
