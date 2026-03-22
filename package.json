@@ -12,16 +12,28 @@
     "cdk": "cdk"
   },
   "devDependencies": {
+    "@types/aws-lambda": "^8.10.161",
     "@types/node": "^24.10.1",
+    "@types/uuid": "^10.0.0",
     "@vitest/coverage-v8": "^4.1.0",
     "aws-cdk": "2.1111.0",
+    "aws-sdk-client-mock": "^4.1.0",
     "esbuild": "^0.27.4",
     "ts-node": "^10.9.2",
     "typescript": "~5.9.3",
     "vitest": "^4.1.0"
   },
   "dependencies": {
+    "@aws-lambda-powertools/logger": "^2.32.0",
+    "@aws-lambda-powertools/metrics": "^2.32.0",
+    "@aws-lambda-powertools/tracer": "^2.32.0",
+    "@aws-sdk/client-dynamodb": "^3.1014.0",
+    "@aws-sdk/client-sns": "^3.1014.0",
+    "@aws-sdk/lib-dynamodb": "^3.1014.0",
+    "@fastify/aws-lambda": "^6.4.0",
     "aws-cdk-lib": "^2.242.0",
-    "constructs": "^10.5.0"
+    "constructs": "^10.5.0",
+    "fastify": "^5.8.2",
+    "uuid": "^13.0.0"
   }
 }

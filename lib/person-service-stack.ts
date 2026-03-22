@@ -10,11 +10,17 @@ import * as logs from 'aws-cdk-lib/aws-logs';
 import * as apigwv2 from 'aws-cdk-lib/aws-apigatewayv2';
 import * as apigwv2_integrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 
+export type AppEnv = 'stage' | 'prod';
+
+export interface PersonServiceStackProps extends cdk.StackProps {
+  appEnv: AppEnv;
+}
+
 export class PersonServiceStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+  constructor(scope: Construct, id: string, props: PersonServiceStackProps) {
     super(scope, id, props);
 
-    const appEnv = 'test';
+    const { appEnv } = props;
 
     // The code that defines your stack goes here
 
@@ -23,7 +29,7 @@ export class PersonServiceStack extends cdk.Stack {
       partitionKey: { name: 'PK', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'SK', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
       pointInTimeRecoverySpecification: {
         pointInTimeRecoveryEnabled: true,
       },
@@ -49,11 +55,14 @@ export class PersonServiceStack extends cdk.Stack {
       bundling: {
         minify: true,
         sourceMap: true,
+        externalModules: []
       },
       environment: {
         TABLE_NAME: table.tableName,
         TOPIC_ARN: topic.topicArn,
         APP_ENV: appEnv,
+        POWERTOOLS_SERVICE_NAME: 'PersonService',
+        POWERTOOLS_METRICS_NAMESPACE: 'PersonServiceNamespace',
       },
       tracing: lambda.Tracing.ACTIVE,
       logRetention: logs.RetentionDays.ONE_MONTH,
@@ -65,6 +74,7 @@ export class PersonServiceStack extends cdk.Stack {
 
     const api = new apigwv2.HttpApi(this, 'PersonServiceHttpApi', {
       apiName: `PersonServiceAPI`,
+      createDefaultStage: false
     });
 
     const integration = new apigwv2_integrations.HttpLambdaIntegration(
@@ -81,7 +91,7 @@ export class PersonServiceStack extends cdk.Stack {
 
     const stage = new apigwv2.HttpStage(this, 'PersonServiceStage', {
       httpApi: api,
-      stageName: appEnv,
+      stageName: '$default',
       throttle: {
         rateLimit: 1000,
         burstLimit: 500,
