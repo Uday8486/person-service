@@ -5,3 +5,9 @@ export interface Person {
   phoneNumber: string;
   address: string;
 }
+
+export interface PaginatedResult<T> {
+  items: T[];
+  nextCursor: string | null;
+  count: number;
+}

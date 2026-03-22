@@ -3,6 +3,7 @@ import { mockClient } from 'aws-sdk-client-mock';
 import {
   DynamoDBDocumentClient,
   PutCommand,
+  QueryCommand
 } from '@aws-sdk/lib-dynamodb';
 import { SNSClient, PublishCommand } from '@aws-sdk/client-sns';
 import { PersonService } from '../../src/services/person.service';
@@ -114,5 +115,83 @@ describe('PersonService', () => {
 
     expect(result).toBeDefined();
     expect(result.firstName).toBe('John');
+  });
+
+
+  it('should list persons with default limits (30)', async () => {
+    ddbMock.on(QueryCommand).resolves({ Items: [] });
+    await personService.getPersons();
+
+    const callArgs = ddbMock.commandCalls(QueryCommand)[0].args[0].input as any;
+    expect(callArgs.Limit).toBe(30);
+  });
+
+  it('should constrain limits to max 100', async () => {
+    ddbMock.on(QueryCommand).resolves({ Items: [] });
+    await personService.getPersons(200);
+
+    const callArgs = ddbMock.commandCalls(QueryCommand)[0].args[0].input as any;
+    expect(callArgs.Limit).toBe(100);
+  });
+
+  it('should decode a valid base64 cursor and set ExclusiveStartKey', async () => {
+    const lastKey = { PK: 'PERSON#1', SK: 'PROFILE' };
+    const cursor = Buffer.from(JSON.stringify(lastKey)).toString('base64');
+
+    ddbMock.on(QueryCommand).resolves({ Items: [], LastEvaluatedKey: lastKey });
+
+    await personService.getPersons(10, cursor);
+
+    const callArgs = ddbMock.commandCalls(QueryCommand)[0].args[0].input as any;
+    expect(callArgs.ExclusiveStartKey).toEqual(lastKey);
+  });
+
+  it('should list persons and remove internal keys (PK, SK, GSI1PK, GSI1SK)', async () => {
+    const mockItems = [
+      {
+        PK: 'PERSON#1',
+        SK: 'PROFILE',
+        GSI1PK: 'TYPE#PERSON',
+        GSI1SK: 'Doe#John#1',
+        id: '1',
+        firstName: 'John',
+        lastName: 'Doe',
+        phoneNumber: '1234567890',
+        address: '123 Main St'
+      }
+    ];
+    ddbMock.on(QueryCommand).resolves({ Items: mockItems });
+    const result = await personService.getPersons();
+
+    expect(result.items.length).toBe(1);
+    expect(result.items[0]).not.toHaveProperty('PK');
+    expect(result.items[0]).not.toHaveProperty('SK');
+    expect(result.items[0]).not.toHaveProperty('GSI1PK');
+    expect(result.items[0]).not.toHaveProperty('GSI1SK');
+    expect(result.items[0].firstName).toBe('John');
+  });
+
+  it('should return nextCursor if LastEvaluatedKey is present', async () => {
+    const lastKey = { PK: 'PERSON#1', SK: 'PROFILE' };
+    ddbMock.on(QueryCommand).resolves({ Items: [], LastEvaluatedKey: lastKey });
+    const result = await personService.getPersons();
+
+    const expectedCursor = Buffer.from(JSON.stringify(lastKey)).toString('base64');
+    expect(result.nextCursor).toBe(expectedCursor);
+  });
+
+  it('should throw an error for an invalid cursor format (not base64 or invalid JSON)', async () => {
+    const invalidCursor = 'not-base64-json';
+    await expect(personService.getPersons(10, invalidCursor)).rejects.toThrow('Invalid cursor format');
+    
+    const invalidJsonCursor = Buffer.from('not-json').toString('base64');
+    await expect(personService.getPersons(10, invalidJsonCursor)).rejects.toThrow('Invalid cursor format');
+  });
+
+  it('should cap limit to minimum 1 if 0 is passed', async () => {
+    ddbMock.on(QueryCommand).resolves({ Items: [] });
+    await personService.getPersons(0);
+    const callArgs = ddbMock.commandCalls(QueryCommand)[0].args[0].input as any;
+    expect(callArgs.Limit).toBe(1);
   });
 });

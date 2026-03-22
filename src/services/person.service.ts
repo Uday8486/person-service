@@ -2,6 +2,8 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import {
   DynamoDBDocumentClient,
   PutCommand,
+  QueryCommand,
+  QueryCommandInput
 } from '@aws-sdk/lib-dynamodb';
 import { SNSClient, PublishCommand } from '@aws-sdk/client-sns';
 import { v4 as uuidv4 } from 'uuid';
@@ -13,7 +15,7 @@ export const logger = new Logger();
 export const metrics = new Metrics();
 export const tracer = new Tracer();
 
-import { Person } from '../models/person';
+import { PaginatedResult, Person } from '../models/person';
 
 const dynamoClient = tracer.captureAWSv3Client(new DynamoDBClient({}));
 const docClient = DynamoDBDocumentClient.from(dynamoClient);
@@ -75,5 +77,48 @@ export class PersonService {
       logger.error('Failed to create person record', { err: error, personId: id });
       throw error;
     }
+  }
+
+  async getPersons(limit: number = 30, cursor?: string): Promise<PaginatedResult<Person>> {
+    const safeLimit = Math.min(Math.max(1, limit), 100);
+
+    const params: QueryCommandInput = {
+      TableName: this.tableName,
+      IndexName: 'GSI1',
+      KeyConditionExpression: 'GSI1PK = :gsi1pk',
+      ExpressionAttributeValues: { ':gsi1pk': 'TYPE#PERSON' },
+      Limit: safeLimit,
+    };
+
+    if (cursor) {
+      try {
+        const decoded = Buffer.from(cursor, 'base64').toString('utf-8');
+        params.ExclusiveStartKey = JSON.parse(decoded);
+      } catch (e) {
+        throw new Error('Invalid cursor format');
+      }
+    }
+
+    const result = await docClient.send(new QueryCommand(params));
+
+    // OPERATIONAL METRIC: Tracks total records returned across fleet
+    metrics.addMetric('PersonsListed', MetricUnit.Count, result.Count || 0);
+
+    const items = (result.Items || []).map(item => {
+      const { PK, SK, GSI1PK, GSI1SK, ...personProps } = item;
+      return personProps as Person;
+    });
+
+    let nextCursor: string | null = null;
+    if (result.LastEvaluatedKey) {
+      const stringified = JSON.stringify(result.LastEvaluatedKey);
+      nextCursor = Buffer.from(stringified).toString('base64');
+    }
+
+    return {
+      items,
+      nextCursor,
+      count: items.length,
+    };
   }
 }

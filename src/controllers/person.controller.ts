@@ -18,4 +18,18 @@ export class PersonController {
       return reply.code(500).send({ error: 'Internal Server Error' });
     }
   };
+
+  getPersons = async (req: FastifyRequest<{ Querystring: { limit?: number; cursor?: string } }>, reply: FastifyReply) => {
+    try {
+      const { limit, cursor } = req.query;
+      const result = await this.service.getPersons(limit ? Number(limit) : undefined, cursor);
+      return reply.code(200).send(result);
+    } catch (error: any) {
+      if (error.message === 'Invalid cursor format') {
+        return reply.code(400).send({ error: error.message });
+      }
+      req.log.error(error);
+      return reply.code(500).send({ error: 'Internal Server Error' });
+    }
+  };
 }

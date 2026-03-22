@@ -34,6 +34,31 @@ const personCreateResponseSchema = {
     }
 };
 
+const querySchema = {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+        limit: { type: 'integer', minimum: 1, maximum: 100, default: 30 },
+        cursor: { type: 'string' },
+    },
+};
+
+const listResponseSchema = {
+    type: 'object',
+    required: ['items', 'count'],
+    properties: {
+        items: {
+            type: 'array',
+            items: personCreateResponseSchema
+        },
+        nextCursor: {
+            type: ['string', 'null']
+        },
+        count: { type: 'integer' }
+    }
+};
+
+
 app.addHook('onResponse', async () => {
     metrics.publishStoredMetrics();
 });
@@ -47,5 +72,13 @@ app.post('/person', {
     },
 }, personController.createPerson);
 
+app.get('/person', {
+    schema: {
+        querystring: querySchema,
+        response: {
+            200: listResponseSchema,
+        }
+    },
+}, personController.getPersons);
 
 export const handler = awsLambdaFastify(app);
