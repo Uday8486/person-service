@@ -1,0 +1,127 @@
+openapi: 3.0.1
+info:
+  title: Person Service API
+  version: 1.0.0
+  description: API for managing person records.
+servers:
+  - url: /
+paths:
+  /person:
+    get:
+      summary: List persons
+      description: Returns a paginated list of persons.
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of items to return (1-100).
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 30
+        - name: cursor
+          in: query
+          description: Base64 encoded cursor for pagination.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+    post:
+      summary: Create a person
+      description: Creates a new person record and triggers a notification.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PersonRequest'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PersonResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+components:
+  schemas:
+    PersonRequest:
+      type: object
+      required:
+        - firstName
+        - lastName
+        - phoneNumber
+        - address
+      properties:
+        firstName:
+          type: string
+          minLength: 1
+          example: Jane
+        lastName:
+          type: string
+          minLength: 1
+          example: Doe
+        phoneNumber:
+          type: string
+          minLength: 10
+          example: "+1234567890"
+        address:
+          type: string
+          minLength: 5
+          example: "123 Main St, New York, NY"
+    
+    PersonResponse:
+      allOf:
+        - $ref: '#/components/schemas/PersonRequest'
+        - type: object
+          required:
+            - id
+          properties:
+            id:
+              type: string
+              format: uuid
+              example: "550e8400-e29b-41d4-a716-446655440000"
+
+    PaginatedResult:
+      type: object
+      required:
+        - items
+        - count
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PersonResponse'
+        nextCursor:
+          type: string
+          nullable: true
+          example: "eyJwayI6ICJQRVJTT04jMTIzIn0="
+        count:
+          type: integer
+          example: 1
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          example: "Invalid input"
+
+  responses:
+    BadRequest:
+      description: Bad Request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
