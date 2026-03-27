@@ -9,6 +9,7 @@ import * as nodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as apigwv2 from 'aws-cdk-lib/aws-apigatewayv2';
 import * as apigwv2_integrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
+import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
 
 export type AppEnv = 'stage' | 'prod';
 
@@ -124,10 +125,136 @@ export class PersonServiceStack extends cdk.Stack {
       autoDeploy: true,
     });
 
+    // Enable detailed metrics to get per-method and per-resource metrics
+    const cfnStage = stage.node.defaultChild as apigwv2.CfnStage;
+    cfnStage.defaultRouteSettings = {
+      detailedMetricsEnabled: true,
+      throttlingBurstLimit: config.throttlingBurstLimit,
+      throttlingRateLimit: config.throttlingRateLimit,
+    };
+
     // Output URL
     new cdk.CfnOutput(this, 'ApiUrl', {
       value: stage.url!,
       exportName: `PersonServiceApiUrl-${appEnv}`,
     });
+
+    // CloudWatch Dashboard
+    const dashboard = new cloudwatch.Dashboard(this, 'PersonServiceDashboard', {
+      dashboardName: `PersonService-${appEnv}`,
+    });
+
+    // API Latency Widget (Per Method)
+    const apiLatencyWidget = new cloudwatch.GraphWidget({
+      title: 'API Latency (Per Method)',
+      left: [
+        new cloudwatch.Metric({
+          namespace: 'AWS/ApiGateway',
+          metricName: 'Latency',
+          dimensionsMap: {
+            ApiId: api.apiId,
+            Stage: stage.stageName,
+            Method: 'GET',
+            Resource: '/person',
+          },
+          statistic: 'p99',
+          label: 'GET p99 Latency',
+        }),
+        new cloudwatch.Metric({
+          namespace: 'AWS/ApiGateway',
+          metricName: 'Latency',
+          dimensionsMap: {
+            ApiId: api.apiId,
+            Stage: stage.stageName,
+            Method: 'POST',
+            Resource: '/person',
+          },
+          statistic: 'p99',
+          label: 'POST p99 Latency',
+        }),
+      ],
+      width: 12,
+    });
+
+    // API Errors Widget (Per Method)
+    const apiErrorsWidget = new cloudwatch.GraphWidget({
+      title: 'API Errors (4xx, 5xx) Per Method',
+      left: [
+        new cloudwatch.Metric({
+          namespace: 'AWS/ApiGateway',
+          metricName: '4xx',
+          dimensionsMap: {
+            ApiId: api.apiId,
+            Stage: stage.stageName,
+            Method: 'GET',
+            Resource: '/person',
+          },
+          statistic: 'Sum',
+          label: 'GET 4xx',
+        }),
+        new cloudwatch.Metric({
+          namespace: 'AWS/ApiGateway',
+          metricName: '5xx',
+          dimensionsMap: {
+            ApiId: api.apiId,
+            Stage: stage.stageName,
+            Method: 'GET',
+            Resource: '/person',
+          },
+          statistic: 'Sum',
+          label: 'GET 5xx',
+        }),
+        new cloudwatch.Metric({
+          namespace: 'AWS/ApiGateway',
+          metricName: '4xx',
+          dimensionsMap: {
+            ApiId: api.apiId,
+            Stage: stage.stageName,
+            Method: 'POST',
+            Resource: '/person',
+          },
+          statistic: 'Sum',
+          label: 'POST 4xx',
+        }),
+        new cloudwatch.Metric({
+          namespace: 'AWS/ApiGateway',
+          metricName: '5xx',
+          dimensionsMap: {
+            ApiId: api.apiId,
+            Stage: stage.stageName,
+            Method: 'POST',
+            Resource: '/person',
+          },
+          statistic: 'Sum',
+          label: 'POST 5xx',
+        }),
+      ],
+      width: 12,
+    });
+
+    // Lambda Performance Widget
+    const lambdaPerformanceWidget = new cloudwatch.GraphWidget({
+      title: 'Lambda Performance',
+      left: [
+        handler.metricDuration({ statistic: 'Average', label: 'Avg Duration' }),
+        handler.metricDuration({ statistic: 'Maximum', label: 'Max Duration' }),
+      ],
+      width: 12,
+    });
+
+    // Lambda Errors Widget
+    const lambdaErrorsWidget = new cloudwatch.GraphWidget({
+      title: 'Lambda Errors & Throttles',
+      left: [
+        handler.metricErrors({ statistic: 'Sum', label: 'Errors' }),
+        handler.metricThrottles({ statistic: 'Sum', label: 'Throttles' }),
+      ],
+      width: 12,
+    });
+
+    dashboard.addWidgets(
+      new cloudwatch.Row(apiLatencyWidget, apiErrorsWidget),
+      new cloudwatch.Row(lambdaPerformanceWidget, lambdaErrorsWidget)
+    );
   }
 }

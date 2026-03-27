@@ -79,9 +79,16 @@ describe('PersonServiceStack', () => {
       StageName: '$default',
       AutoDeploy: true,
       DefaultRouteSettings: {
+        DetailedMetricsEnabled: true,
         ThrottlingBurstLimit: 100,
         ThrottlingRateLimit: 50,
       },
+    });
+  });
+
+  it('should have a CloudWatch dashboard', () => {
+    template.hasResourceProperties('AWS::CloudWatch::Dashboard', {
+      DashboardName: 'PersonService-stage',
     });
   });
 });
